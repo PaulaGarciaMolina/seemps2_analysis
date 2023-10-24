@@ -1,0 +1,1 @@
+"""Singular Padé-Chebyshev prototype."""
