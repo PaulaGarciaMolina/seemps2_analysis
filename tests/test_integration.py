@@ -32,6 +32,3 @@ class TestIntegration(TestCase):
     def test_convergence_fejer(self):
         """Test the asymptotic convergence of the Féjer quadrature."""
         pass
-
-    def test_norm_distances(self):
-        pass

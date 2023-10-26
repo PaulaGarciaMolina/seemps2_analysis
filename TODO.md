@@ -22,7 +22,7 @@
 - Develop the Cross-based global optimization method proposed by Juanjo.
 
 ## Low priority
-- Develop prototypes (Padé, SPC, CrossDMRG, extrapolation...).
+- Develop prototypes (Padé, SPC, CrossDMRG, extrapolation, circuit method...).
 - Further optimize the libraries.
     - JAX / PyTorch port for GPU.
     - C++ ports.

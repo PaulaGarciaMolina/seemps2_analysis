@@ -5,7 +5,7 @@ import sys, pathlib
 sys.path.append(str(pathlib.Path(__file__).parents[2]))
 
 from seemps.state import Strategy
-from seemps.analysis import (
+from seemps.cross import (
     Mesh,
     RegularClosedInterval,
     ChebyshevZerosInterval,
