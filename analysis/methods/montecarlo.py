@@ -1,5 +1,5 @@
 from typing import Callable
-from seemps.analysis import Mesh
+from seemps.cross import Mesh
 import numpy as np
 import vegas
 

@@ -11,7 +11,8 @@ from seemps.cross import (
     ChebyshevZerosInterval,
 )
 
-from analysis.methods import chebyshev_expansion, integrate_mps
+from analysis.utils import time_this
+from analysis.methods import chebyshev_expand, integrate_mps
 from analysis.functions import distance_norm_1, distance_norm_2, distance_norm_inf
 from analysis.loops import param_loop_pickle
 from analysis.plots import plot_mosaic_3
@@ -30,16 +31,21 @@ def helper_chebyshev_convergence(
         """Computes the integrals and norms of a multivariate Chebyshev expansion with
         orders d, MPS truncations t, and on a square mesh with n qubits."""
         mesh = Mesh([RegularClosedInterval(a, b, 2**n) for _ in range(m)])
-        dlist = [d for _ in m]
+        orders = [d for _ in m]
         strategy = Strategy(tolerance=t)
-        mps = chebyshev_expansion(func, mesh, dlist, strategy=strategy)
-        mesh_fejer = Mesh([ChebyshevZerosInterval(a, b, 2**n) for _ in range(m)])
-        mps_fejer = chebyshev_expansion(func, mesh_fejer, dlist, strategy=strategy)
+        mps, time_expand = time_this(
+            chebyshev_expand(func, mesh, orders, strategy=strategy)
+        )
 
-        integral_types = ["midpoint", "trapezoidal", "simpson", "fifth"]
         integrals = []
-        for integral_type in integral_types[-1]:
-            integrals.append(integrate_mps(mps, integral_type=integral_type))
+        times = [time_expand]
+        for integral_type in ["midpoint", "trapezoidal", "simpson", "fifth"]:
+            integral, time = time_this(integrate_mps(mps, integral_type=integral_type))
+            integrals.append(integral)
+            times.append(time)
+
+        mesh_fejer = Mesh([ChebyshevZerosInterval(a, b, 2**n) for _ in range(m)])
+        mps_fejer = chebyshev_expand(func, mesh_fejer, orders, strategy=strategy)
         integrals.append(integrate_mps(mps_fejer, integral_type="fejer"))
 
         y_mps = mps.to_vector()
@@ -52,7 +58,7 @@ def helper_chebyshev_convergence(
         data = {
             "integrals": np.array(integrals),
             "norms": np.array(norms),
-            "time": None,
+            "times": times,
         }
 
         return data

@@ -1,5 +1,5 @@
 from typing import Callable
-from seemps.analysis import Mesh
+from seemps.cross import Mesh
 from seemps.state import MPS, Strategy, DEFAULT_TOLERANCE
 
 

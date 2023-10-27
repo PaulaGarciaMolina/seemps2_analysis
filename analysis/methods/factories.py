@@ -1,5 +1,6 @@
 import numpy as np
 
+from seemps.cross import Interval
 from seemps.state import MPS, Strategy, DEFAULT_TOLERANCE
 from seemps.mpo import MPO
 
@@ -26,25 +27,54 @@ def mps_cosine(start: float, stop: float, sites: int) -> MPS:
     return (0.5 * (mps_1 + mps_2)).toMPS()
 
 
-def mps_position(start: float, stop: float, sites: int, mesh_type: str = "o") -> MPS:
-    """Returns a MPS corresponding to an interval x of a certain type given by
-    the mesh_type parameter. Options:
-        - "o": Half-open interval [start, stop).
-        - "c": Closed interval [start, stop].
-        - "z": Affine map between the zeros of the N-th Chebyshev polynomial
-               in [-1, 1] to (start, stop).
-    """
-    assert mesh_type in ["o", "c", "z"], "Invalid mesh_type"
-    if mesh_type == "o":
-        mps = mpo_position(start, stop, sites) @ mps_identity(sites)
-    elif mesh_type == "c":
-        stop += (stop - start) / (2**sites - 1)
-        mps = mpo_position(start, stop, sites) @ mps_identity(sites)
-    elif mesh_type == "z":
+def mps_position(interval: Interval) -> MPS:
+    sites = int(np.log2(interval.size))
+    if interval.type == "open":
+        mps = mpo_position(interval.start, interval.stop, sites) @ mps_identity(sites)
+    elif interval.type == "closed":
+        stop += (interval.stop - interval.start) / (2**sites - 1)
+        mps = mpo_position(interval.start, stop, sites) @ mps_identity(sites)
+    elif interval.type == "zeros":
         start_mapped = np.pi / (2 ** (sites + 1))
         stop_mapped = np.pi + start_mapped
         mps = -1.0 * mps_cosine(start_mapped, stop_mapped, sites)
     return mps
+
+
+# def mps_position(start: float, stop: float, sites: int, mesh_type: str = "o") -> MPS:
+#     """Returns a MPS corresponding to an interval x of a certain type given by
+#     the mesh_type parameter. Options:
+#         - "o": Half-open interval [start, stop).
+#         - "c": Closed interval [start, stop].
+#         - "z": Affine map between the zeros of the N-th Chebyshev polynomial
+#                in [-1, 1] to (start, stop).
+#     """
+#     assert mesh_type in ["o", "c", "z"], "Invalid mesh_type"
+#     if mesh_type == "o":
+#         mps = mpo_position(start, stop, sites) @ mps_identity(sites)
+#     elif mesh_type == "c":
+#         stop += (stop - start) / (2**sites - 1)
+#         mps = mpo_position(start, stop, sites) @ mps_identity(sites)
+#     elif mesh_type == "z":
+#         start_mapped = np.pi / (2 ** (sites + 1))
+#         stop_mapped = np.pi + start_mapped
+#         mps = -1.0 * mps_cosine(start_mapped, stop_mapped, sites)
+#     return mps
+
+
+def mpo_empty(sites: int) -> MPO:
+    """Returns a MPO corresponding to the identity."""
+
+    identity = np.zeros((1, 2, 2, 1))
+    return MPO([identity] * sites)
+
+
+def mpo_identity(sites: int) -> MPO:
+    """Returns a MPO corresponding to the identity."""
+
+    identity = np.zeros((1, 2, 2, 1))
+    identity[0, :, :, 0] = np.eye(2)
+    return MPO([identity] * sites)
 
 
 def mpo_position(start: float, stop: float, sites: int) -> MPO:

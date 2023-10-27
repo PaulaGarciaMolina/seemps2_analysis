@@ -4,7 +4,7 @@ from typing import Callable, List
 
 def step(x_cusp: float = 0) -> Callable:
     """Returns a one-dimensional step function centered at x_cusp."""
-    return lambda x: np.heaviside(x - x_cusp, 0.5)
+    return lambda x: np.heaviside(x - x_cusp, 1)
 
 
 def step_smooth(x_cusp: float = 0, c: float = 0.1) -> Callable:
@@ -27,4 +27,10 @@ def rectifier(x_cusp: float = 0, slope: float = 1) -> Callable:
 def piecewise(funcs: List[Callable], x_cusps: List[float]) -> Callable:
     """Returns a one-dimensional piecewise function by sewing together a given
     collection of functions at a given collection of cusp points."""
-    pass
+    x_cusps.sort()
+
+    def piecewise_function(x):
+        func_idx = next((i for i, xc in enumerate(x_cusps) if x < xc), len(funcs) - 1)
+        return funcs[func_idx](x)
+
+    return piecewise_function

@@ -4,47 +4,6 @@ from typing import Callable, List
 from numpy.linalg import inv, det
 
 
-# def _rotation_matrix(angle, vector1, vector2, abs_tolerance=1e-10):
-#     """Returns a m-dimensional rotation matrix.
-#     From https://pypi.org/project/mgen/
-#     """
-#     vector1 = np.asarray(vector1, dtype=float)
-#     vector2 = np.asarray(vector2, dtype=float)
-#     vector1_length = np.linalg.norm(vector1)
-#     if math.isclose(vector1_length, 0.0, abs_tol=abs_tolerance):
-#         raise ValueError(
-#             "Given vector1 must have norm greater than zero within given numerical tolerance: {:.0e}".format(
-#                 abs_tolerance
-#             )
-#         )
-#     vector2_length = np.linalg.norm(vector2)
-#     if math.isclose(vector2_length, 0.0, abs_tol=abs_tolerance):
-#         raise ValueError(
-#             "Given vector2 must have norm greater than zero within given numerical tolerance: {:.0e}".format(
-#                 abs_tolerance
-#             )
-#         )
-#     vector2 /= vector2_length
-#     dot_value = np.dot(vector1, vector2)
-
-#     if abs(dot_value / vector1_length) > 1 - abs_tolerance:
-#         raise ValueError(
-#             "Given vectors are parallel within the given tolerance: {:.0e}".format(
-#                 abs_tolerance
-#             )
-#         )
-#     if abs(dot_value / vector1_length) > abs_tolerance:
-#         vector1 = vector1 - dot_value * vector2
-#         vector1 /= np.linalg.norm(vector1)
-#     else:
-#         vector1 /= vector1_length
-#     vectors = np.vstack([vector1, vector2]).T
-#     vector1, vector2 = np.linalg.qr(vectors)[0].T
-#     V = np.outer(vector1, vector1) + np.outer(vector2, vector2)
-#     W = np.outer(vector1, vector2) - np.outer(vector2, vector1)
-#     return np.eye(len(vector1)) + (math.cos(angle) - 1) * V - math.sin(angle) * W
-
-
 def _rotation_matrix(
     angle: float, vector_1: List[float], vector_2: List[float]
 ) -> np.ndarray:
