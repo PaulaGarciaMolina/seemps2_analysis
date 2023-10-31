@@ -1,6 +1,7 @@
 import numpy as np
 import h5py
 import pickle
+from typing import Callable, Optional
 from itertools import product
 
 
@@ -35,29 +36,30 @@ def param_loop_hdf5(func, funcdim, params, path=None, file="", group=""):
     return data
 
 
-def param_loop_pickle(func, funcdim, params, path=None, name=""):
+def param_loop(
+    func: Callable, params: dict, name: str = "", path: Optional[str] = None
+) -> np.ndarray:
     """Runs a function on all the combinations of the parameters inside the params dictionary"""
     param_names = list(params.keys())
     param_values = list(params.values())
     dims = [len(value) for value in param_values]
-    data = np.zeros(dims + [funcdim])
+    data = np.empty(dims, dtype=object)
 
     def enumerated_product(*args):
         yield from zip(product(*(range(len(x)) for x in args)), product(*args))
 
     for idx, value in enumerated_product(*param_values):
         prefix = ["".join(map(str, i)) for i in zip(param_names, value)]
-        filename = name + "_" + "_".join(prefix) + ".pickle"
+        filename = name + "_" + "_".join(prefix) + ".pkl"
         try:
-            print(f"Loading {filename}")
             with open(path + filename, "rb") as f:
                 data[idx] = pickle.load(f)
-                print(f"{filename} loaded.")
+                print(f"Loading {filename}")
         except:
-            print(f"Computing and saving {filename}")
+            print(f"Computing {filename}")
             data[idx] = func(*value)
             if path:
                 with open(path + filename, "wb+") as f:
                     pickle.dump(data[idx], f, 2)
-                    print(f"{filename} saved.")
+                    print(f"Saving {filename}")
     return data

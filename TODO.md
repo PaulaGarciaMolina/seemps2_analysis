@@ -1,7 +1,7 @@
 # TODO LIST
 
 ## High priority
-- Finish the basic implementation of the `analysis` module, for example the Python functions, the plotting routines or the sequential loop function.
+- Finish the basic implementation of the `analysis` module, for example the Python functions, the plotting routines or the sequential loop function. DONE
 - Implement the `analysis` module in a branch of my fork of SeeMPS2 with all the required algorithms.
 - Implement the simulations for the Chebyshev and Cross algorithms for one-dimensional functions.
 - Benchmark the Chebyshev, Cross and SVD algorithms for 1d functions and get some plots.

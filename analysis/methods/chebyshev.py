@@ -1,6 +1,7 @@
 import numpy as np
 import h5py
 import pathlib
+from copy import deepcopy
 from typing import Callable, List, Union, Optional
 
 from seemps.typing import Sequence
@@ -134,7 +135,7 @@ def chebyshev_expand(
     for each_order in np.ndindex(coef_tensor.shape):
         each_mps = []
         for idx, order in enumerate(each_order):
-            interval = mesh.intervals[idx]
+            interval = deepcopy(mesh.intervals[idx])
             interval.start = -1.0
             interval.stop = 1.0
             name = f"mps_chebyshev-type_{interval.type}-sites_{int(np.log2(interval.size))}"
@@ -145,11 +146,11 @@ def chebyshev_expand(
 
 
 def chebyshev_compose(
-    tensor_network_0: Union[MPS, MPO, MPOSum],
     func: Callable,
+    tensor_network_0: Union[MPS, MPO, MPOSum],
+    order: int,
     start: float,
     stop: float,
-    order: int,
     strategy: Strategy = Strategy(tolerance=DEFAULT_TOLERANCE),
 ) -> Union[MPS, MPOSum]:
     mesh = Mesh([ChebyshevZerosInterval(start, stop, 0)])

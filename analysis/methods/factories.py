@@ -32,7 +32,7 @@ def mps_position(interval: Interval) -> MPS:
     if interval.type == "open":
         mps = mpo_position(interval.start, interval.stop, sites) @ mps_identity(sites)
     elif interval.type == "closed":
-        stop += (interval.stop - interval.start) / (2**sites - 1)
+        stop = interval.stop + (interval.stop - interval.start) / (2**sites - 1)
         mps = mpo_position(interval.start, stop, sites) @ mps_identity(sites)
     elif interval.type == "zeros":
         start_mapped = np.pi / (2 ** (sites + 1))

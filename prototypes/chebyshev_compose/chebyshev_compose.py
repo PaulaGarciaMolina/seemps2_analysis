@@ -7,8 +7,9 @@ sys.path.append(os.getcwd() + "/src/")
 
 import numpy as np
 from numpy import pi, sin, cos, exp, sqrt
-
 import matplotlib.pyplot as plt
+
+from analysis.functions.filters import *
 
 
 def linear_map(vec, a1, b1, a2, b2):
@@ -87,42 +88,29 @@ def chebyshev_expansion(f, g, a, b, n, d, mesh="e"):
     return fvector
 
 
-def rectifier(x_cusp: float = 0, slope: float = 1):
-    """Returns a one-dimensional linear-rectifier function centered at x_cusp
-    and with a given slope."""
-    return lambda x: slope * x * (x - x_cusp > 0)
-
-
-def step(x_cusp: float = 0):
-    """Returns a one-dimensional step function centered at x_cusp."""
-    return lambda x: np.heaviside(x - x_cusp, 1)
-
-
 def abs(x_cusp: float = 0):
     """Returns a one-dimensional absolute value function centered at x_cusp."""
     return lambda x: np.abs(x - x_cusp)
 
 
-a = -0.5
-b = 1.00
-n = 5
+a = -2.0
+b = 2.0
+n = 6
 d = 50
 mesh = "e"
 
 # f = lambda x: x * (x > 0)
-filter = rectifier(0)
+filter = rectifier(x_cusp=0.7, cutoff="bottom", adjust=False)
 func = lambda x: np.exp(-(x**2))
 fname = f"Composición de ReLU con sin(x) para d = {d}"
 
 x = interval(a, b, n, mesh=mesh)
-fvector = chebyshev_expansion(
-    filter, func, a, b, n, d, mesh=mesh
-)  # Efectivamente, es tan facil como hacer x -> f(x)
+fvector = chebyshev_expansion(filter, func, a, b, n, d, mesh=mesh)
 
 plt.plot(x, func(x), label="func(x)")
-plt.plot(x, filter(x), label="filter(x)")
+plt.plot(x, filter(x), ".", label="filter(x)")
 plt.plot(x, filter(func(x)), label="filter(func(x))")
-plt.plot(x, fvector, "o", label="Chebyshev filter(func(x))")
+# plt.plot(x, fvector, label="Chebyshev filter(func(x))")
 plt.legend()
 plt.show()
 

@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 
 from analysis.methods.chebyshev import _coef_tensor, mps_chebyshev
 from analysis.methods.factories import mps_position
-from analysis.methods import chebyshev_expand, chebyshev_filter
-from analysis.functions import step
+from analysis.methods import chebyshev_expand, chebyshev_compose
+from analysis.functions import rectifier
 
 from seemps.state import MPS
 from seemps.cross import Mesh, RegularHalfOpenInterval
@@ -12,11 +12,7 @@ from seemps.cross import Mesh, RegularHalfOpenInterval
 from .tools import TestCase
 
 
-def exponential_setup(m):
-    a = -1
-    b = 1
-    n = 6
-    func = lambda vec: vec[0]  # np.exp(vec[0])
+def func_setup(func, m, a=-1, b=1, n=5):
     mesh = Mesh([RegularHalfOpenInterval(a, b, 2**n) for _ in range(m)])
     mesh_tensor = mesh.to_tensor()
     func_vector = np.apply_along_axis(func, -1, mesh_tensor).flatten()
@@ -26,7 +22,8 @@ def exponential_setup(m):
 
 class TestChebyshev(TestCase):
     def test_coef_vector(self):
-        func, mesh, _, _ = exponential_setup(1)
+        exponential = lambda vec: np.exp(vec[0])
+        func, mesh, _, _ = func_setup(exponential, 1)
         coef_exp = [
             1.266065877752008,
             1.130318207984970,
@@ -44,28 +41,32 @@ class TestChebyshev(TestCase):
         cheb_vector = cheb_func(interval.to_vector())
         self.assertSimilar(cheb_vector, cheb_mps.to_vector())
 
-    def test_expansion_1d(self):
-        func, mesh, _, func_vector = exponential_setup(1)
-        mps = chebyshev_expand(func, mesh, [10])
+    def test_chebyshev_expand_1d(self):
+        gaussian = lambda vec: np.exp(-np.sum(vec**2))
+        func, mesh, _, func_vector = func_setup(gaussian, 1)
+        mps = chebyshev_expand(func, mesh, [20])
         self.assertSimilar(func_vector, mps.to_vector())
 
-    def test_expansion_2d(self):
-        func, mesh, _, func_vector = exponential_setup(2)
-        mps = chebyshev_expand(func, mesh, [10, 10])
+    def test_chebyshev_expand_2d(self):
+        gaussian = lambda vec: np.exp(-np.sum(vec**2))
+        func, mesh, _, func_vector = func_setup(gaussian, 2)
+        mps = chebyshev_expand(func, mesh, [20, 20])
         self.assertSimilar(func_vector, mps.to_vector())
 
-    def test_filter_mps(self):
-        func, mesh, mps_0, func_vector = exponential_setup(1)
-        x = mesh.to_tensor()
-        filter = step(0)
-        mps = chebyshev_filter(mps_0, filter, -2.0, 2.0, 10)
-        plt.plot(x, func_vector, label="Function")
-        plt.plot(x, filter(x), label="Filter")
-        plt.plot(x, mps.to_vector(), "-o", label="Filtered MPS")
+    def test_chebyshev_compose_mps(self):
+        gaussian = lambda vec: np.exp(-np.sum(vec**2))
+        func, mesh, mps_0, func_vector = func_setup(gaussian, 1, a=-2, b=2)
+        x = mesh.to_tensor().flatten()
+        filter = rectifier(0.1, cutoff="bottom")
+        mps = chebyshev_compose(filter, mps_0, 50, -1.0, 1.0)
+        plt.plot(x, func_vector, label="func(x)")
+        plt.plot(x, filter(x), ".", label="filter(x)")
+        plt.plot(x, filter(func_vector), label="filter(func(x))")
+        plt.plot(x, mps.to_vector(), label="ChebMPS filter(func(x))")
         plt.legend()
         plt.show()
 
-    def test_filter_mpo(self):
+    def test_chebyshev_compose_mpo(self):
         pass
 
 

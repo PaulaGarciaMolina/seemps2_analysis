@@ -8,7 +8,7 @@ from seemps.hdf5 import read_mps, write_mps
 from seemps.state import MPS, Strategy, DEFAULT_TOLERANCE
 from seemps.cross import Mesh
 
-from .factories import mps_empty, mps_identity, mps_position
+from ..factories import mps_empty, mps_identity, mps_position
 
 
 DATA_PATH = str(pathlib.Path(__file__).parent.absolute()) + "/data/"

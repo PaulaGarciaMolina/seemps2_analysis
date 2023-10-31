@@ -1,7 +1,9 @@
 import numpy as np
 from scipy.fftpack import ifft
+from typing import List
 
 from seemps.state import MPS, Strategy, DEFAULT_TOLERANCE
+from seemps.expectation import scprod
 from seemps.cross import Mesh
 from .factories import mps_identity
 
@@ -38,7 +40,7 @@ def mps_trapezoidal(
 def mps_simpson(start: float, stop: float, sites: int, from_vector: bool = True) -> MPS:
     """Returns the MPS corresponding to the Simpson quadrature rule in the interval
     [start, stop] with 2**sites points."""
-    if sites % 4 != 0:
+    if sites % 2 != 0:
         raise ValueError("The sites must be divisible by 2.")
     if from_vector:
         vector = np.ones(2**sites)
@@ -116,7 +118,33 @@ def mps_fejer(start: float, stop: float, points: int, from_vector: bool = True) 
     return step * mps
 
 
-def integrate_mps(mps: MPS, mesh: Mesh, integration_type: str) -> float:
+def integrate_mps(mps: MPS, mesh: Mesh, integral_type: str) -> float:
     """Returns the integral of a MPS that codifies a multivariate function in a given
     mesh with respect to a quadrature rule given by the parameter integration_type."""
-    pass
+    if integral_type == "midpoint":
+        factory = mps_midpoint
+    elif integral_type == "trapezoidal":
+        factory = mps_trapezoidal
+    elif integral_type == "simpson" and len(mps) % 2 == 0:
+        factory = mps_simpson
+    elif integral_type == "fifth_order" and len(mps) % 4 == 0:
+        factory = mps_fifth_order
+    elif integral_type == "fejer":
+        factory = mps_fejer
+    else:
+        return None
+        # raise ValueError("Invalid integral_type")
+
+    mps_list = []
+    for interval in mesh.intervals:
+        mps_list.append(
+            factory(interval.start, interval.stop, int(np.log2(interval.size)))
+        )
+    return scprod(mps, _join(mps_list))
+
+
+def _join(mps_list: List[MPS]) -> MPS:
+    """Returns a MPS that is given by the union of a list of MPS by their extremes."""
+    nested_sites = [mps._data for mps in mps_list]
+    flattened_sites = [site for sites in nested_sites for site in sites]
+    return MPS(flattened_sites)
