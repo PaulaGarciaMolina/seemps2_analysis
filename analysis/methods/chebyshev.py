@@ -4,11 +4,10 @@ import pathlib
 from copy import deepcopy
 from typing import Callable, List, Union, Optional
 
-from seemps.typing import Sequence
 from seemps.hdf5 import read_mps, write_mps, read_mpo, write_mpo
 from seemps.cross import Mesh, Interval, ChebyshevZerosInterval
 from seemps.state import MPS, Strategy, DEFAULT_TOLERANCE
-from seemps.mpo import MPO, MPOSum
+from seemps.mpo import MPO, MPOSum, MPOList
 
 from .factories import mps_empty, mps_identity, mps_position
 from .factories import mpo_empty, mpo_identity
@@ -17,9 +16,7 @@ DATA_PATH = str(pathlib.Path(__file__).parent.absolute()) + "/data/"
 
 
 def _zeros_evaluated(order: int, i: int) -> np.ndarray:
-    return np.array(
-        [np.cos(np.pi * i * (2 * k - 1) / (2 * order)) for k in range(1, order + 1)]
-    )
+    return np.array([np.cos(np.pi * i * (2 * k - 1) / (2 * order)) for k in range(1, order + 1)])
 
 
 def _zeros(order: int) -> np.ndarray:
@@ -36,16 +33,14 @@ def mps_chebyshev(
     mps_0: MPS,
     order: int,
     name: Optional[str] = None,
-    strategy: Strategy = Strategy(tolerance=DEFAULT_TOLERANCE),
+    strategy: Strategy = Strategy(),
 ) -> MPS:
     path = DATA_PATH + name + ".hdf5" if name is not None else None
     sites = len(mps_0)
     try:
         with h5py.File(path, "r") as file:
             Ti = read_mps(file, f"order_{order}")
-            Tj = (
-                read_mps(file, f"order_{order-1}") if order > 0 else mps_identity(sites)
-            )
+            Tj = read_mps(file, f"order_{order-1}") if order > 0 else mps_identity(sites)
     except:
         if order == 0:
             Ti = mps_identity(sites)
@@ -54,23 +49,29 @@ def mps_chebyshev(
             Ti = mps_0
             Tj = mps_identity(sites)
         else:
+            # print(f"Computing {name}, {order}")
             Tj = mps_chebyshev(mps_0, order - 1, name)
             Tk = mps_chebyshev(mps_0, order - 2, name)
-            Ti = (2.0 * mps_0 * Tj - Tk).toMPS(strategy=strategy)
+            Ti = (2.0 * mps_0 * Tj - Tk).join(strategy=strategy)
         if name is not None:
             with h5py.File(path, "a") as file:
                 write_mps(file, f"order_{order}", Ti)
     return Ti
 
 
-def mpo_chebyshev(mpo_0: Union[MPO, MPOSum], order: int, name: str) -> MPOSum:
-    path = DATA_PATH + name + ".hdf5"
+def mpo_chebyshev(
+    mpo_0: Union[MPO, MPOSum],
+    order: int,
+    name: str,
+    strategy: Strategy = Strategy(tolerance=DEFAULT_TOLERANCE),
+) -> MPOSum:
+    path = DATA_PATH + name + ".hdf5" if name is not None else None
+    sites = len(mpo_0)
     try:
         with h5py.File(path, "r") as file:
             Ti = read_mpo(file, f"order_{order}")
-            Tj = read_mpo(file, f"order_{order-1}")
+            Tj = read_mpo(file, f"order_{order-1}") if order > 0 else mpo_identity(sites)
     except:
-        sites = len(mpo_0)
         if order == 0:
             Ti = mpo_identity(sites)
             Tj = mpo_identity(sites)
@@ -80,9 +81,10 @@ def mpo_chebyshev(mpo_0: Union[MPO, MPOSum], order: int, name: str) -> MPOSum:
         else:
             Tj = mpo_chebyshev(mpo_0, order - 1, name)
             Tk = mpo_chebyshev(mpo_0, order - 2, name)
-            Ti = 2.0 * mpo_0 * Tj - Tk
-        with h5py.File(path, "a") as file:
-            write_mpo(file, f"order_{order}", Ti)
+            Ti = (2.0 * MPOList([mpo_0, Tj]).join(strategy) - Tk).join(strategy)
+        if name is not None:
+            with h5py.File(path, "a") as file:
+                write_mpo(file, f"order_{order}", Ti)
     return Ti
 
 
@@ -92,7 +94,8 @@ def _func_tensor(func: Callable, mesh: Mesh, orders: List[int]) -> np.ndarray:
         for idx, interval in enumerate(mesh.intervals)
     ]
     cheb_tensor = Mesh(intervals).to_tensor()
-    return np.apply_along_axis(func, -1, cheb_tensor)
+    # TODO: Optimize this
+    return np.apply_along_axis(lambda x: func(*x), -1, cheb_tensor)
 
 
 def _coef_tensor(func: Callable, mesh: Mesh, orders: List[int]) -> np.ndarray:
@@ -124,10 +127,7 @@ def _join(mps_list: List[MPS]) -> MPS:
 
 
 def chebyshev_expand(
-    func: Callable,
-    mesh: Mesh,
-    orders: List[int],
-    strategy: Strategy = Strategy(tolerance=DEFAULT_TOLERANCE),
+    func: Callable, mesh: Mesh, orders: List[int], strategy: Strategy = Strategy()
 ) -> MPS:
     """Encodes a multivariate function in a MPS by means of a truncated Chebyshev expansion."""
     coef_tensor = _coef_tensor(func, mesh, orders)
@@ -141,7 +141,26 @@ def chebyshev_expand(
             name = f"mps_chebyshev-type_{interval.type}-sites_{int(np.log2(interval.size))}"
             each_mps.append(mps_chebyshev(mps_position(interval), order, name))
         mps += coef_tensor[each_order] * _join(each_mps)
-        mps = mps.toMPS(strategy=strategy)
+        mps = mps.join(strategy=strategy)
+    return mps
+
+
+def chebyshev_expand_clenshaw_1d(
+    func: Callable, mesh: Mesh, order: int, strategy: Strategy = Strategy()
+) -> MPS:
+    coef_vector = _coef_tensor(func, mesh, order)
+    interval = deepcopy(mesh.intervals[0])
+    interval.start = -1.0
+    interval.stop = 1.0
+    mps0 = mps_position(interval)
+
+    c = np.flip(coef_vector)
+    zero_mps = mps_empty(len(mps0))
+    id_mps = mps_identity(len(mps0))
+    y = [zero_mps] * (len(c) + 2)
+    for i in range(2, len(y)):
+        y[i] = (c[i - 2] * id_mps - y[i - 2] + 2 * mps0 * y[i - 1]).join(strategy=strategy)
+    mps = (y[-1] - mps0 * y[-2]).join(strategy=strategy)
     return mps
 
 
@@ -158,14 +177,14 @@ def chebyshev_compose(
     if isinstance(tensor_network_0, MPS):
         tensor_network = mps_empty(len(tensor_network_0))
         for idx, coef in enumerate(coef_vector):
-            name = None
+            name = f"mps_chebyshev-type_open-sites_{len(tensor_network_0)}"
             tensor_network += coef * mps_chebyshev(tensor_network_0, idx, name)
             tensor_network = tensor_network.toMPS(strategy=strategy)
     elif isinstance(tensor_network_0, Union[MPO, MPOSum]):
         tensor_network = mpo_empty(len(tensor_network_0))
         for idx, coef in enumerate(coef_vector):
-            name = "name"
-            tensor_network += coef * mps_chebyshev(tensor_network_0, idx, name)
+            name = f"mpo_chebyshev-type_open-sites_{len(tensor_network_0)}"
+            tensor_network += coef * mpo_chebyshev(tensor_network_0, idx, name)
     else:
         raise ValueError("Invalid tensor network")
     return tensor_network

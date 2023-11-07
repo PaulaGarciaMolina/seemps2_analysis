@@ -9,5 +9,6 @@
     "python.testing.pytestEnabled": true,
     "black-formatter.args": [
         "--line-length=100"
-    ]
+    ],
+    "editor.formatOnSave": true
 }

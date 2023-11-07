@@ -10,6 +10,9 @@ from .factories import mps_identity
 QUADRATURE_STRATEGY = Strategy(tolerance=DEFAULT_TOLERANCE)
 
 
+# TODO: Clean the quadrature functions
+
+
 def mps_midpoint(start: float, stop: float, sites: int) -> MPS:
     """Returns the MPS corresponding to the midpoint quadrature rule in the interval
     [start, stop] with 2**sites points."""
@@ -17,9 +20,7 @@ def mps_midpoint(start: float, stop: float, sites: int) -> MPS:
     return step * mps_identity(sites)
 
 
-def mps_trapezoidal(
-    start: float, stop: float, sites: int, from_vector: bool = True
-) -> MPS:
+def mps_trapezoidal(start: float, stop: float, sites: int, from_vector: bool = False) -> MPS:
     """Returns the MPS corresponding to the trapezoidal quadrature rule in the interval
     [start, stop] with 2**sites points."""
     if from_vector:
@@ -32,15 +33,31 @@ def mps_trapezoidal(
             strategy=QUADRATURE_STRATEGY,
         )
     else:
-        raise ValueError("MPS not implemented")
+        tensor_1 = np.zeros((1, 2, 3))
+        tensor_1[0, 0, 0] = 1
+        tensor_1[0, 1, 1] = 1
+        tensor_1[0, 0, 2] = 1
+        tensor_1[0, 1, 2] = 1
+        tensor_bulk = np.zeros((3, 2, 3))
+        tensor_bulk[0, 0, 0] = 1
+        tensor_bulk[1, 1, 1] = 1
+        tensor_bulk[2, 0, 2] = 1
+        tensor_bulk[2, 1, 2] = 1
+        tensor_2 = np.zeros((3, 2, 1))
+        tensor_2[0, 0, 0] = -0.5
+        tensor_2[1, 1, 0] = -0.5
+        tensor_2[2, 0, 0] = 1
+        tensor_2[2, 1, 0] = 1
+        tensors = [tensor_1] + [tensor_bulk for _ in range(sites - 2)] + [tensor_2]
+        mps = MPS(tensors)
     step = (stop - start) / (2**sites - 1)
     return step * mps
 
 
-def mps_simpson(start: float, stop: float, sites: int, from_vector: bool = True) -> MPS:
+def mps_simpson(start: float, stop: float, sites: int, from_vector: bool = False) -> MPS:
     """Returns the MPS corresponding to the Simpson quadrature rule in the interval
     [start, stop] with 2**sites points."""
-    if sites % 2 != 0:
+    if sites % 2 != 0 and not sites > 2:
         raise ValueError("The sites must be divisible by 2.")
     if from_vector:
         vector = np.ones(2**sites)
@@ -55,14 +72,60 @@ def mps_simpson(start: float, stop: float, sites: int, from_vector: bool = True)
             strategy=QUADRATURE_STRATEGY,
         )
     else:
-        raise ValueError("MPS not implemented")
+        # TODO: Clean this up
+        if sites == 2:
+            tensor_1 = np.zeros((1, 2, 4))
+            tensor_1[0, 0, 0] = 1
+            tensor_1[0, 1, 1] = 1
+            tensor_1[0, 0, 2] = 1
+            tensor_1[0, 1, 3] = 1
+
+            tensor_2 = np.zeros((4, 2, 1))
+            tensor_2[0, 0, 0] = -1
+            tensor_2[1, 1, 0] = -1
+            tensor_2[2, 0, 0] = 2
+            tensor_2[2, 1, 0] = 3
+            tensor_2[3, 0, 0] = 3
+            tensor_2[3, 1, 0] = 2
+            tensors = [tensor_1, tensor_2]
+        else:
+            tensor_1 = np.zeros((1, 2, 4))
+            tensor_1[0, 0, 0] = 1
+            tensor_1[0, 1, 1] = 1
+            tensor_1[0, 0, 2] = 1
+            tensor_1[0, 1, 3] = 1
+            tensor_2 = np.zeros((4, 2, 5))
+            tensor_2[0, 0, 0] = 1
+            tensor_2[1, 1, 1] = 1
+            tensor_2[2, 0, 2] = 1
+            tensor_2[2, 1, 3] = 1
+            tensor_2[3, 0, 4] = 1
+            tensor_2[3, 1, 2] = 1
+            tensor_bulk = np.zeros((5, 2, 5))
+            tensor_bulk[0, 0, 0] = 1
+            tensor_bulk[1, 1, 1] = 1
+            tensor_bulk[2, 0, 2] = 1
+            tensor_bulk[2, 1, 3] = 1
+            tensor_bulk[3, 0, 4] = 1
+            tensor_bulk[3, 1, 2] = 1
+            tensor_bulk[4, 0, 3] = 1
+            tensor_bulk[4, 1, 4] = 1
+            tensor_3 = np.zeros((5, 2, 1))
+            tensor_3[0, 0, 0] = -1
+            tensor_3[1, 1, 0] = -1
+            tensor_3[2, 0, 0] = 2
+            tensor_3[2, 1, 0] = 3
+            tensor_3[3, 0, 0] = 3
+            tensor_3[3, 1, 0] = 2
+            tensor_3[4, 0, 0] = 3
+            tensor_3[4, 1, 0] = 3
+            tensors = [tensor_1, tensor_2] + [tensor_bulk for _ in range(sites - 3)] + [tensor_3]
+        mps = MPS(tensors)
     step = (stop - start) / (2**sites - 1)
     return (3 * step / 8) * mps
 
 
-def mps_fifth_order(
-    start: float, stop: float, sites: int, from_vector: bool = True
-) -> MPS:
+def mps_fifth_order(start: float, stop: float, sites: int, from_vector: bool = False) -> MPS:
     """Returns the MPS corresponding to the fifth-order quadrature rule in the interval
     [start, stop] with 2**sites points."""
     if sites % 4 != 0:
@@ -82,7 +145,59 @@ def mps_fifth_order(
             strategy=QUADRATURE_STRATEGY,
         )
     else:
-        raise ValueError("MPS not implemented")
+        tensor_1 = np.zeros((1, 2, 4))
+        tensor_1[0, 0, 0] = 1
+        tensor_1[0, 1, 1] = 1
+        tensor_1[0, 0, 2] = 1
+        tensor_1[0, 1, 3] = 1
+        tensor_2 = np.zeros((4, 2, 6))
+        tensor_2[0, 0, 0] = 1
+        tensor_2[1, 1, 1] = 1
+        tensor_2[2, 0, 2] = 1
+        tensor_2[2, 1, 3] = 1
+        tensor_2[3, 0, 4] = 1
+        tensor_2[3, 1, 5] = 1
+        tensor_3 = np.zeros((6, 2, 7))
+        tensor_3[0, 0, 0] = 1
+        tensor_3[1, 1, 1] = 1
+        tensor_3[2, 0, 2] = 1
+        tensor_3[2, 1, 3] = 1
+        tensor_3[3, 0, 4] = 1
+        tensor_3[3, 1, 5] = 1
+        tensor_3[4, 0, 6] = 1
+        tensor_3[4, 1, 2] = 1
+        tensor_3[5, 0, 3] = 1
+        tensor_3[5, 1, 4] = 1
+        tensor_bulk = np.zeros((7, 2, 7))
+        tensor_bulk[0, 0, 0] = 1
+        tensor_bulk[1, 1, 1] = 1
+        tensor_bulk[2, 0, 2] = 1
+        tensor_bulk[2, 1, 3] = 1
+        tensor_bulk[3, 0, 4] = 1
+        tensor_bulk[3, 1, 5] = 1
+        tensor_bulk[4, 0, 6] = 1
+        tensor_bulk[4, 1, 2] = 1
+        tensor_bulk[5, 0, 3] = 1
+        tensor_bulk[5, 1, 4] = 1
+        tensor_bulk[6, 0, 5] = 1
+        tensor_bulk[6, 1, 6] = 1
+        tensor_4 = np.zeros((7, 2, 1))
+        tensor_4[0, 0, 0] = -19
+        tensor_4[1, 1, 0] = -19
+        tensor_4[2, 0, 0] = 38
+        tensor_4[2, 1, 0] = 75
+        tensor_4[3, 0, 0] = 50
+        tensor_4[3, 1, 0] = 50
+        tensor_4[4, 0, 0] = 75
+        tensor_4[4, 1, 0] = 38
+        tensor_4[5, 0, 0] = 75
+        tensor_4[5, 1, 0] = 50
+        tensor_4[6, 0, 0] = 50
+        tensor_4[6, 1, 0] = 75
+        tensors = (
+            [tensor_1, tensor_2, tensor_3] + [tensor_bulk for _ in range(sites - 4)] + [tensor_4]
+        )
+        mps = MPS(tensors)
     step = (stop - start) / (2**sites - 1)
     return (5 * step / 288) * mps
 
@@ -97,9 +212,7 @@ def mps_fejer(start: float, stop: float, points: int, from_vector: bool = True) 
         """Computes the vector of Féjer weigths of a given length d."""
         N = np.arange(start=1, stop=d, step=2)[:, None]
         l = N.size
-        v0 = [2 * np.exp(1j * np.pi * k / d) / (1 - 4 * k**2) for k in range(l)] + [
-            0
-        ] * (l + 1)
+        v0 = [2 * np.exp(1j * np.pi * k / d) / (1 - 4 * k**2) for k in range(l)] + [0] * (l + 1)
         v1 = v0[0:-1] + np.conj(v0[:0:-1])
         wf1 = ifft(v1).flatten().real
         return wf1
@@ -137,9 +250,7 @@ def integrate_mps(mps: MPS, mesh: Mesh, integral_type: str) -> float:
 
     mps_list = []
     for interval in mesh.intervals:
-        mps_list.append(
-            factory(interval.start, interval.stop, int(np.log2(interval.size)))
-        )
+        mps_list.append(factory(interval.start, interval.stop, int(np.log2(interval.size))))
     return scprod(mps, _join(mps_list))
 
 

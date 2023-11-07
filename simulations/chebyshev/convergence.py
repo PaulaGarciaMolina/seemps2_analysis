@@ -11,7 +11,7 @@ from seemps.state import Strategy
 from seemps.cross import Mesh, RegularClosedInterval
 
 from analysis.utils import time_this
-from analysis.methods import chebyshev_expand, integrate_mps
+from analysis.methods import chebyshev_expand, chebyshev_expand_clenshaw_1d, integrate_mps
 from analysis.functions import distance_norm_1, distance_norm_2, distance_norm_inf, step, absolute
 from analysis.loops import param_loop
 from analysis.plots import PlotParameters, plot_line, set_mosaic
@@ -28,8 +28,10 @@ def helper(func: Callable, m: int, a: float, b: float) -> Callable:
         # Run the algoritm
         mesh = Mesh([RegularClosedInterval(a, b, 2**n) for _ in range(m)])
         orders = [d for _ in range(m)]
-        strategy = Strategy(tolerance=t)
-        mps, time_expand = time_this(chebyshev_expand)(func, mesh, orders, strategy=strategy)
+        strategy = Strategy()  # tolerance=t)
+        mps, time_expand = time_this(chebyshev_expand_clenshaw_1d)(
+            func, mesh, orders, strategy=strategy
+        )
 
         # Compute integrals
         integrals = np.array([])
@@ -44,9 +46,11 @@ def helper(func: Callable, m: int, a: float, b: float) -> Callable:
         distances = np.array([])
         y_mps = mps.to_vector()
         y_vec = np.apply_along_axis(func, axis=-1, arr=mesh.to_tensor()).flatten()
-        distances = np.append(distances, distance_norm_1(y_mps, y_vec))
-        distances = np.append(distances, distance_norm_2(y_mps, y_vec))
-        distances = np.append(distances, distance_norm_inf(y_mps, y_vec))
+        norm_1, time_norm_1 = time_this(distance_norm_1)(y_mps, y_vec)
+        norm_2, time_norm_2 = time_this(distance_norm_2)(y_mps, y_vec)
+        norm_inf, time_norm_inf = time_this(distance_norm_inf)(y_mps, y_vec)
+        distances = np.append(distances, [norm_1, norm_2, norm_inf])
+        times = np.append(times, [time_norm_1, time_norm_2, time_norm_inf])
 
         # Save results (should be an object)
         data = {
@@ -90,25 +94,29 @@ def main(
 
     # PLOT MOSAIC
     fig, axs = set_mosaic(2, 3, figsize=(15, 10))
-
+    axs[0, 0].xaxis.set_major_locator(MaxNLocator(integer=True))
+    axs[0, 1].xaxis.set_major_locator(MaxNLocator(integer=True))
+    axs[0, 2].xaxis.set_major_locator(MaxNLocator(integer=True))
+    axs[1, 0].xaxis.set_major_locator(MaxNLocator(integer=True))
+    axs[1, 1].xaxis.set_major_locator(MaxNLocator(integer=True))
+    axs[1, 2].xaxis.set_major_locator(MaxNLocator(integer=True))
     # First Row: Plots as a function of n (integral, norm and runtime).
-    parameters_n = PlotParameters(xlabel="n", marker="-o", yscale="log")
+    parameters_n = PlotParameters(xlabel="n", style="-o", yscale="log")
     parameters_n1 = replace(
         parameters_n,
         ylabel=r"$\frac{I - I_{{exact}}}{I_{{exact}}}$",
         legend_title="Integral type",
         legend_labels=["midpoint", "trapezoidal", "simpson", "fifth_order"],
     )
-    axs[0, 0].xaxis.set_major_locator(MaxNLocator(integer=True))
+
     plot_line(nlist, integral_errors_n, axs=axs[0, 0], parameters=parameters_n1)
     parameters_n2 = replace(
         parameters_n,
         ylabel=r"$\frac{|f|^p - |f|^p_{{exact}}}{2^n}$",
         title=f"(fixing d = {dlist[-1]}, t = {tlist[-1]})",
         legend_title="Norm type",
-        legend_labels=["L1", "L2", "Linf"],
+        legend_labels=["L1 normalized", "L2 normalized", "Linf"],
     )
-    axs[0, 1].xaxis.set_major_locator(MaxNLocator(integer=True))
     plot_line(nlist, distances_n, axs=axs[0, 1], parameters=parameters_n2)
     parameters_n3 = replace(
         parameters_n,
@@ -120,13 +128,15 @@ def main(
             "trapezoidal",
             "simpson",
             "fifth_order",
+            "norm-1",
+            "norm-2",
+            "norm-inf",
         ],
     )
-    axs[0, 2].xaxis.set_major_locator(MaxNLocator(integer=True))
     plot_line(nlist, times_n, axs=axs[0, 2], parameters=parameters_n3)
 
     # Second Row: Plots as a function of d (integral, norm and runtime).
-    parameters_d = PlotParameters(xlabel="d", marker="-o", yscale="log")
+    parameters_d = PlotParameters(xlabel="d", style="-o", yscale="log")
     parameters_d1 = replace(parameters_d, ylabel=r"$\frac{I - I_{{exact}}}{I_{{exact}}}$")
     plot_line(dlist, integral_errors_d, axs=axs[1, 0], parameters=parameters_d1)
     parameters_d2 = replace(
@@ -150,63 +160,70 @@ if __name__ == "__main__":
     m = 1
     a = -1.0
     b = 1.0
-    nlist = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+    nlist = list(range(2, 21))
+    dlist = list(range(1, 21))
     tlist = [1e-16]
-    show = False
+    show = True
 
-    # # 1. e^x
-    # func = lambda vec: np.exp(vec[0])
-    # exact_integral = np.exp(b) - np.exp(a)
-    # dlist = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30]
-    # name = f"exponential_[{a},{b}]"
-    # main(func, m, a, b, nlist, dlist, tlist, exact_integral, name=name, show=show)
-
-    # # 2. e^(-x)
-    # func = lambda vec: np.exp(-vec[0])
-    # exact_integral = np.exp(-a) - np.exp(-b)
-    # dlist = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30]
-    # name = f"exponential_inv_[{a},{b}]"
-    # main(func, m, a, b, nlist, dlist, tlist, exact_integral, name=name, show=show)
-
-    # # 3. x^2
-    # func = lambda vec: vec[0] ** 2
-    # exact_integral = (b**3 - a**3) / 3
-    # dlist = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    # name = f"xsquared_[{a},{b}]"
-    # main(func, m, a, b, nlist, dlist, tlist, exact_integral, name=name, show=show)
-
-    # # 4. cos(k*x)
-    # k = 3
-    # func = lambda vec: np.cos(k * vec[0])
-    # exact_integral = (np.sin(b * k) - np.sin(a * k)) / k
-    # dlist = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30]
-    # name = f"cos({k}x)_[{a},{b}]"
-    # main(func, m, a, b, nlist, dlist, tlist, exact_integral, name=name, show=show)
-
-    # # 4. e^(-x**2)
-    # σ = 0.5
-    # func = lambda vec: np.exp(-vec[0] ** 2 / (2 * σ))
-    # exact_integral = np.sqrt(σ * np.pi / 2) * (
-    #     np.math.erf(b / (np.sqrt(2) * np.sqrt(σ))) - np.math.erf(a / (np.sqrt(2) * np.sqrt(σ)))
-    # )
-    # nlist_ext = nlist  # + [22, 24, 26]
-    # dlist = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30]
-    # name = f"gaussian_[{a},{b}]"
-    # main(func, m, a, b, nlist_ext, dlist, tlist, exact_integral, name=name, show=show)
-
-    # # 6. step(x)
-    # x_cusp = 0.5
-    # b_symmetric = 2 * x_cusp - a  # Must be symmetric to converge the oscillations
-    # func = step(x_cusp)
-    # exact_integral = b_symmetric - x_cusp
-    # dlist = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-    # name = f"step_cusp{x_cusp}_[{a},{b}]"
-    # main(func, m, a, b_symmetric, nlist, dlist, tlist, exact_integral, name=name, show=show)
-
-    # 7. abs(x)
-    x_cusp = 0
-    func = absolute(x_cusp)
-    exact_integral = (b**2 + a**2) / 2
-    dlist = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500]
-    name = f"abs_cusp{x_cusp}_[{a},{b}]"
+    # 1. e^x
+    func = lambda x: np.exp(x)
+    exact_integral = np.exp(b) - np.exp(a)
+    name = f"exponential_[{a},{b}]"
     main(func, m, a, b, nlist, dlist, tlist, exact_integral, name=name, show=show)
+
+    # 2. e^(-x)
+    func = lambda x: np.exp(-x)
+    exact_integral = np.exp(-a) - np.exp(-b)
+    name = f"exponential_inv_[{a},{b}]"
+    main(func, m, a, b, nlist, dlist, tlist, exact_integral, name=name, show=show)
+
+    # 3. x^2
+    func = lambda x: x**2
+    exact_integral = (b**3 - a**3) / 3
+    name = f"xsquared_[{a},{b}]"
+    main(func, m, a, b, nlist, dlist, tlist, exact_integral, name=name, show=show)
+
+    # 4. cos(k*x)
+    k = 3
+    func = lambda x: np.cos(k * x)
+    exact_integral = (np.sin(b * k) - np.sin(a * k)) / k
+    name = f"cos({k}x)_[{a},{b}]"
+    main(func, m, a, b, nlist, dlist, tlist, exact_integral, name=name, show=show)
+
+    # 5. e^(-x**2)
+    σ = 0.5
+    func = lambda x: np.exp(-(x**2) / (2 * σ))
+    exact_integral = np.sqrt(σ * np.pi / 2) * (
+        np.math.erf(b / (np.sqrt(2) * np.sqrt(σ))) - np.math.erf(a / (np.sqrt(2) * np.sqrt(σ)))
+    )
+    nlist_ext = nlist  # + [22, 24, 26]
+    name = f"gaussian_[{a},{b}]"
+    main(func, m, a, b, nlist_ext, dlist, tlist, exact_integral, name=name, show=show)
+
+    dlist = range(1, 101)
+
+    # 6. step(x) centered
+    func = step(0.0)
+    exact_integral = b
+    name = f"step_[{a},{b}]"
+    main(func, m, a, b, nlist, dlist, tlist, exact_integral, name=name, show=show)
+
+    # 6. step(x) displaced
+    x_cut = 0.5
+    func = step(x_cut)
+    exact_integral = b - x_cut
+    name = f"step_cut{x_cut}_[{a},{b}]"
+    main(func, m, a, b, nlist, dlist, tlist, exact_integral, name=name, show=show)
+
+    # 7. abs(x) centered
+    func = absolute(0)
+    exact_integral = (b**2 + a**2) / 2
+    name = f"abs_[{a},{b}]"
+    main(func, m, a, b, nlist, dlist, tlist, exact_integral, name=name, show=show)
+
+    # # 8. abs(x) displaced
+    # x_cut = 0.5
+    # func = absolute(x_cut)
+    # exact_integral = (b**2 + a**2) / 2
+    # name = f"abs_cut{x_cut}_[{a},{b}]"
+    # main(func, m, a, b, nlist, dlist, tlist, exact_integral, name=name, show=show)

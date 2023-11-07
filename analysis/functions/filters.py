@@ -4,7 +4,7 @@ from typing import Callable, List
 
 def step(x_cusp: float = 0, a: float = 1, b: float = 0) -> Callable:
     """Returns a one-dimensional step function centered at x_cusp."""
-    return lambda x: a * np.heaviside(x[0] - x_cusp, a / 2) + b
+    return lambda x: a * np.heaviside(x - x_cusp, a / 2) + b
 
 
 def step_smooth(x_cusp: float = 0, c: float = 0.1) -> Callable:
@@ -15,7 +15,7 @@ def step_smooth(x_cusp: float = 0, c: float = 0.1) -> Callable:
 
 def absolute(x_cusp: float = 0, a: float = 1, b: float = 0) -> Callable:
     """Returns a one-dimensional absolute value function centered at x_cusp."""
-    return lambda x: a * np.abs(x[0] - x_cusp) + b
+    return lambda x: a * np.abs(x - x_cusp) + b
 
 
 def rectifier(

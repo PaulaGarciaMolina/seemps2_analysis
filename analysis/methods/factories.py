@@ -1,8 +1,9 @@
 import numpy as np
+from typing import List, Union
 
 from seemps.cross import Interval
 from seemps.state import MPS, Strategy, DEFAULT_TOLERANCE
-from seemps.mpo import MPO
+from seemps.mpo import MPO, MPOSum
 
 QUADRATURE_STRATEGY = Strategy(tolerance=DEFAULT_TOLERANCE)
 
@@ -94,9 +95,7 @@ def mpo_position(start: float, stop: float, sites: int) -> MPO:
     for i in range(len(middle_tensors)):
         middle_tensors[i][0, :, :, 0] = np.eye(2)
         middle_tensors[i][1, :, :, 1] = np.eye(2)
-        middle_tensors[i][0, :, :, 1] = np.array(
-            [[0, 0], [0, dx * 2 ** (sites - (i + 2))]]
-        )
+        middle_tensors[i][0, :, :, 1] = np.array([[0, 0], [0, dx * 2 ** (sites - (i + 2))]])
 
     tensors = [left_tensor] + middle_tensors + [right_tensor]
     return MPO(tensors)
@@ -125,3 +124,15 @@ def mpo_exponential(start: float, stop: float, sites: int, c: float = 1.0) -> MP
 
     tensors = [left_tensor] + middle_tensors + [right_tensor]
     return MPO(tensors)
+
+
+def join_list(tn_list: List[Union[MPS, MPO]]) -> Union[MPS, MPO]:
+    """Joins a list of tensor networks (MPS or MPO) on their extremes"""
+    nested_sites = [tn._data for tn in tn_list]
+    flattened_sites = [site for sites in nested_sites for site in sites]
+    if all(isinstance(tn, MPS) for tn in tn_list):
+        return MPS(flattened_sites)
+    elif all(isinstance(tn, MPO) for tn in tn_list):
+        return MPO(flattened_sites)
+    else:
+        raise ValueError("All the tensor networks must be of the same type (either MPS or MPO).")

@@ -1,13 +1,8 @@
-# Add parent directory to path:
-import os
-import sys
-
-sys.path.append(os.getcwd())
-sys.path.append(os.getcwd() + "/src/")
-
 import numpy as np
-from numpy import pi, sin, cos, exp, sqrt
 import matplotlib.pyplot as plt
+import sys, pathlib
+
+sys.path.append(str(pathlib.Path(__file__).parents[2]))
 
 from analysis.functions.filters import *
 
@@ -25,21 +20,17 @@ def interval(a, b, n, mesh):
         interval = np.array([a + i * (b - a) / 2**n for i in range(2**n)])
     elif mesh == "z":
         d = 2**n
-        cnodes = np.array(
-            [np.cos(np.pi * (2 * k - 1) / (2 * d)) for k in range(1, d + 1)]
-        )
+        cnodes = np.array([np.cos(np.pi * (2 * k - 1) / (2 * d)) for k in range(1, d + 1)])
         interval = np.flip(linear_map(cnodes, -1, 1, a, b))
     return interval
 
 
 def chebyshev_zeros(d):
-    return np.array([cos(pi * (2 * k - 1) / (2 * d)) for k in range(1, d + 1)])
+    return np.array([np.cos(np.pi * (2 * k - 1) / (2 * d)) for k in range(1, d + 1)])
 
 
 def chebyshev_eval(d):
-    return lambda i: np.array(
-        [cos(i * (2 * k - 1) * pi / (2 * d)) for k in range(1, d + 1)]
-    )
+    return lambda i: np.array([np.cos(i * (2 * k - 1) * np.pi / (2 * d)) for k in range(1, d + 1)])
 
 
 def chebyshev_coefficients(f, d):
