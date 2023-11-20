@@ -7,7 +7,21 @@ from itertools import product
 def param_loop(
     func: Callable, params: dict, name: str = "", path: Optional[str] = None
 ) -> np.ndarray:
-    """Runs a function on all the combinations of the parameters inside the params dictionary"""
+    """
+    Evaluate a function on all combinations of parameters defined in the params
+    dictionary and optionally save the result in a pickle file.
+
+    Parameters:
+        func (callable): The function to be evaluated.
+        params (dict): A dictionary where keys are parameter names and values are lists of
+            parameter values to be combined.
+        name (str, optional): A name prefix for the pickle output files (default: "").
+        path (str, optional): The path where intermediate results are saved and loaded from
+            (default: None).
+
+    Returns:
+        np.ndarray: An array containing the results of function evaluations for all parameter combinations.
+    """
     param_names = list(params.keys())
     param_values = list(params.values())
     dims = [len(value) for value in param_values]

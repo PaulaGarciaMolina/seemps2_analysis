@@ -251,13 +251,12 @@ def chebyshev_factor(func, mesh, orders, strategy):
 
     # 3. Represent each monomial as an MPS
     mps_list = []
+    mps_x = mps_position(mesh.interval)
     for root in roots:
-        interval = deepcopy(mesh.interval)
-        interval.start += root
-        interval.stop += root
-        mps_list.append(mps_position(interval))
+        mps_root = root * mps_identity
+        mps_list.append(mps_x - mps_root)
 
-    # 4. Compute the wavefunction product of each MPS
+    # 4. Compute the wavefunction product of all the MPS
     mps = mps_list[0]
     for mps_term in mps_list[1:]:
         mps *= mps_term
