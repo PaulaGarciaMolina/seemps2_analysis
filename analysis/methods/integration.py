@@ -5,7 +5,7 @@ from typing import List
 from seemps.state import MPS, Strategy, DEFAULT_TOLERANCE
 from seemps.expectation import scprod
 from seemps.cross import Mesh
-from .factories import mps_identity
+from .factories_mps import mps_identity, join_list
 
 QUADRATURE_STRATEGY = Strategy(tolerance=DEFAULT_TOLERANCE)
 
@@ -14,15 +14,28 @@ QUADRATURE_STRATEGY = Strategy(tolerance=DEFAULT_TOLERANCE)
 
 
 def mps_midpoint(start: float, stop: float, sites: int) -> MPS:
-    """Returns the MPS corresponding to the midpoint quadrature rule in the interval
-    [start, stop] with 2**sites points."""
+    """
+    Returns a Matrix Product State (MPS) corresponding to the midpoint quadrature rule.
+
+    Parameters:
+        start (float): The starting point of the interval.
+        stop (float): The ending point of the interval.
+        sites (int): The number of sites or qubits for the MPS.
+    """
     step = (stop - start) / (2**sites - 1)
     return step * mps_identity(sites)
 
 
 def mps_trapezoidal(start: float, stop: float, sites: int, from_vector: bool = False) -> MPS:
-    """Returns the MPS corresponding to the trapezoidal quadrature rule in the interval
-    [start, stop] with 2**sites points."""
+    """
+    Returns a Matrix Product State (MPS) corresponding to the trapezoidal quadrature rule.
+
+    Parameters:
+        start (float): The starting point of the interval.
+        stop (float): The ending point of the interval.
+        sites (int): The number of sites or qubits for the MPS.
+        from_vector (bool): Whether to construct the MPS from a vector (True) or tensors (False).
+    """
     if from_vector:
         vector = np.ones(2**sites)
         vector[0] = vector[-1] = 0.5
@@ -55,8 +68,15 @@ def mps_trapezoidal(start: float, stop: float, sites: int, from_vector: bool = F
 
 
 def mps_simpson(start: float, stop: float, sites: int, from_vector: bool = False) -> MPS:
-    """Returns the MPS corresponding to the Simpson quadrature rule in the interval
-    [start, stop] with 2**sites points."""
+    """
+    Return a Matrix Product State (MPS) corresponding to the Simpson quadrature rule.
+
+    Parameters:
+        start (float): The starting point of the interval.
+        stop (float): The ending point of the interval.
+        sites (int): The number of sites or qubits for the MPS.
+        from_vector (bool): Whether to construct the MPS from a vector (True) or tensors (False).
+    """
     if sites % 2 != 0 and not sites > 2:
         raise ValueError("The sites must be divisible by 2.")
     if from_vector:
@@ -126,8 +146,15 @@ def mps_simpson(start: float, stop: float, sites: int, from_vector: bool = False
 
 
 def mps_fifth_order(start: float, stop: float, sites: int, from_vector: bool = False) -> MPS:
-    """Returns the MPS corresponding to the fifth-order quadrature rule in the interval
-    [start, stop] with 2**sites points."""
+    """
+    Return a Matrix Product State (MPS) corresponding to the fifth-order quadrature rule.
+
+    Parameters:
+        start (float): The starting point of the interval.
+        stop (float): The ending point of the interval.
+        sites (int): The number of sites or qubits for the MPS.
+        from_vector (bool): Whether to construct the MPS from a vector (True) or tensors (False).
+    """
     if sites % 4 != 0:
         raise ValueError("The sites must be divisible by 4.")
     if from_vector:
@@ -203,9 +230,14 @@ def mps_fifth_order(start: float, stop: float, sites: int, from_vector: bool = F
 
 
 def mps_fejer(start: float, stop: float, points: int, from_vector: bool = True) -> MPS:
-    """Returns the MPS corresponding to the Féjer quadrature rule in the interval
-    [start, stop] with N = 2**sites points located on the zeros of the N-th Chebyshev
-    polynomial.
+    """
+    Return a Matrix Product State (MPS) corresponding to the Féjer quadrature rule.
+
+    Parameters:
+        start (float): The starting point of the interval.
+        stop (float): The ending point of the interval.
+        points (int): The number of quadrature points.
+        from_vector (bool): Whether to construct the MPS from a vector (True) or tensors (False).
     """
 
     def _fejer_weights(d: int) -> np.ndarray:
@@ -232,8 +264,27 @@ def mps_fejer(start: float, stop: float, points: int, from_vector: bool = True) 
 
 
 def integrate_mps(mps: MPS, mesh: Mesh, integral_type: str) -> float:
-    """Returns the integral of a MPS that codifies a multivariate function in a given
-    mesh with respect to a quadrature rule given by the parameter integration_type."""
+    """
+    Calculate the integral of an MPS encoding a multivariate function over a given mesh
+    using a quadrature rule determined by the parameter 'integral_type'.
+
+    Parameters:
+        mps (MPS): The MPS representing the function to be integrated.
+        mesh (Mesh): The mesh over which the function is integrated.
+        integral_type (str): The type of quadrature rule to use for integration.
+            Supported types: 'midpoint', 'trapezoidal', 'simpson', 'fifth_order', 'fejer'.
+
+    Returns:
+        float: The computed integral value.
+
+    Example:
+        >>> # Define an MPS and mesh representing a function
+        >>> mps = MPS([...])  # Replace with your MPS data
+        >>> mesh = Mesh([...])  # Replace with your mesh data
+        >>> # Calculate the integral using the midpoint quadrature rule
+        >>> integral_value = integrate_mps(mps, mesh, 'midpoint')
+
+    """
     if integral_type == "midpoint":
         factory = mps_midpoint
     elif integral_type == "trapezoidal":
@@ -245,17 +296,16 @@ def integrate_mps(mps: MPS, mesh: Mesh, integral_type: str) -> float:
     elif integral_type == "fejer":
         factory = mps_fejer
     else:
-        return None
-        # raise ValueError("Invalid integral_type")
+        raise ValueError("Invalid integral_type")
 
     mps_list = []
     for interval in mesh.intervals:
         mps_list.append(factory(interval.start, interval.stop, int(np.log2(interval.size))))
-    return scprod(mps, _join(mps_list))
+    return scprod(mps, join_list(mps_list))
 
 
-def _join(mps_list: List[MPS]) -> MPS:
-    """Returns a MPS that is given by the union of a list of MPS by their extremes."""
-    nested_sites = [mps._data for mps in mps_list]
-    flattened_sites = [site for sites in nested_sites for site in sites]
-    return MPS(flattened_sites)
+# def _join(mps_list: List[MPS]) -> MPS:
+#     """Returns a MPS that is given by the union of a list of MPS by their extremes."""
+#     nested_sites = [mps._data for mps in mps_list]
+#     flattened_sites = [site for sites in nested_sites for site in sites]
+#     return MPS(flattened_sites)

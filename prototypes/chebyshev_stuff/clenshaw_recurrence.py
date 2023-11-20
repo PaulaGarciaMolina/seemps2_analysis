@@ -5,7 +5,7 @@ import sys, pathlib
 sys.path.append(str(pathlib.Path(__file__).parents[2]))
 
 from seemps.cross import Mesh, RegularHalfOpenInterval
-from analysis.methods.chebyshev import _coef_tensor
+from analysis.methods.chebyshev_vector import _coef_tensor
 
 
 def clenshaw_1d(coef_vector: np.ndarray, x: np.ndarray) -> np.ndarray:

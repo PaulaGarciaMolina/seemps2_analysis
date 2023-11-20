@@ -1,9 +1,8 @@
-from typing import Callable
-from seemps.cross import Mesh
 import numpy as np
+from seemps.cross import Mesh, RegularClosedInterval
 
 
-def integrate_montecarlo(func: Callable, mesh: Mesh, samples: int = 10000) -> float:
+def integrate_montecarlo(func, mesh, samples=int(1e6)):
     """
     Perform Monte Carlo integration to estimate the integral of a multivariate function.
 
@@ -36,5 +35,11 @@ def integrate_montecarlo(func: Callable, mesh: Mesh, samples: int = 10000) -> fl
     return np.mean(func_values) * volume
 
 
-def integrate_vegas(func: Callable, mesh: Mesh, samples: int = 10000) -> float:
-    pass
+if __name__ == "__main__":
+    a = -1.0
+    b = 1.0
+    func = lambda x, y: x + y
+    mesh = Mesh([RegularClosedInterval(a, b, 2) for _ in range(2)])
+    intg_exact = 0.5 * (b**2 - a**2) * 2
+    intg_mc = integrate_montecarlo(func, mesh)
+    print(intg_exact, intg_mc, intg_exact - intg_mc)

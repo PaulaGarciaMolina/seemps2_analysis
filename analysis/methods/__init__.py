@@ -1,6 +1,6 @@
-from .chebyshev import chebyshev_expand, chebyshev_expand_clenshaw_1d, chebyshev_compose
+from .chebyshev_vector import *
 from .entropies import *
-from .factories import *
+from .factories_mps import *
 from .integration import *
 from .montecarlo import *
 from .svd import *

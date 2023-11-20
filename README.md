@@ -1,6 +1,6 @@
 ## SeeMPS2 Analysis
 
-Module to perform analysis and simulations based on the SeeMPS2 library.
+Module to perform simulations for quantum-inspired numerical analysis based on the SeeMPS2 library.
 
 1. **Analysis:** Tools neded to perform the analysis and simulations.
 2. **Notebooks:** Self-explanatory notebooks to illustrate some of the algorithms of SeeMPS2.

@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from analysis.methods.chebyshev import _coef_tensor, mps_chebyshev
-from analysis.methods.factories import mps_position
+from analysis.methods.chebyshev_vector import _coef_tensor, mps_chebyshev
+from analysis.methods.factories_mps import mps_position
 from analysis.methods.vector import vector_chebyshev, clenshaw_1d
 from analysis.methods import chebyshev_expand, chebyshev_compose
 from analysis.functions import rectifier
