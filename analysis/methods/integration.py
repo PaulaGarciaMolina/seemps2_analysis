@@ -10,9 +10,6 @@ from .factories_mps import mps_identity, join_list
 QUADRATURE_STRATEGY = Strategy(tolerance=DEFAULT_TOLERANCE)
 
 
-# TODO: Clean the quadrature functions
-
-
 def mps_midpoint(start: float, stop: float, sites: int) -> MPS:
     """
     Returns a Matrix Product State (MPS) corresponding to the midpoint quadrature rule.
@@ -92,14 +89,12 @@ def mps_simpson(start: float, stop: float, sites: int, from_vector: bool = False
             strategy=QUADRATURE_STRATEGY,
         )
     else:
-        # TODO: Clean this up
+        tensor_1 = np.zeros((1, 2, 4))
+        tensor_1[0, 0, 0] = 1
+        tensor_1[0, 1, 1] = 1
+        tensor_1[0, 0, 2] = 1
+        tensor_1[0, 1, 3] = 1
         if sites == 2:
-            tensor_1 = np.zeros((1, 2, 4))
-            tensor_1[0, 0, 0] = 1
-            tensor_1[0, 1, 1] = 1
-            tensor_1[0, 0, 2] = 1
-            tensor_1[0, 1, 3] = 1
-
             tensor_2 = np.zeros((4, 2, 1))
             tensor_2[0, 0, 0] = -1
             tensor_2[1, 1, 0] = -1
@@ -109,11 +104,6 @@ def mps_simpson(start: float, stop: float, sites: int, from_vector: bool = False
             tensor_2[3, 1, 0] = 2
             tensors = [tensor_1, tensor_2]
         else:
-            tensor_1 = np.zeros((1, 2, 4))
-            tensor_1[0, 0, 0] = 1
-            tensor_1[0, 1, 1] = 1
-            tensor_1[0, 0, 2] = 1
-            tensor_1[0, 1, 3] = 1
             tensor_2 = np.zeros((4, 2, 5))
             tensor_2[0, 0, 0] = 1
             tensor_2[1, 1, 1] = 1
@@ -239,18 +229,13 @@ def mps_fejer(start: float, stop: float, points: int, from_vector: bool = True) 
         points (int): The number of quadrature points.
         from_vector (bool): Whether to construct the MPS from a vector (True) or tensors (False).
     """
-
-    def _fejer_weights(d: int) -> np.ndarray:
-        """Computes the vector of Féjer weigths of a given length d."""
+    if from_vector:
+        d = 2**points
         N = np.arange(start=1, stop=d, step=2)[:, None]
         l = N.size
         v0 = [2 * np.exp(1j * np.pi * k / d) / (1 - 4 * k**2) for k in range(l)] + [0] * (l + 1)
         v1 = v0[0:-1] + np.conj(v0[:0:-1])
-        wf1 = ifft(v1).flatten().real
-        return wf1
-
-    if from_vector:
-        vector = _fejer_weights(2**points)
+        vector = ifft(v1).flatten().real
         mps = MPS.from_vector(
             vector,
             [2 for _ in range(points)],
@@ -258,6 +243,8 @@ def mps_fejer(start: float, stop: float, points: int, from_vector: bool = True) 
             strategy=QUADRATURE_STRATEGY,
         )
     else:
+        # TODO: Implement (low priority as it converges so fast and not many qubits are needed)
+        # In principle it can be implemented using the exponential MPS and iqft.
         raise ValueError("MPS not implemented")
     step = (stop - start) / 2
     return step * mps
@@ -302,10 +289,3 @@ def integrate_mps(mps: MPS, mesh: Mesh, integral_type: str) -> float:
     for interval in mesh.intervals:
         mps_list.append(factory(interval.start, interval.stop, int(np.log2(interval.size))))
     return scprod(mps, join_list(mps_list))
-
-
-# def _join(mps_list: List[MPS]) -> MPS:
-#     """Returns a MPS that is given by the union of a list of MPS by their extremes."""
-#     nested_sites = [mps._data for mps in mps_list]
-#     flattened_sites = [site for sites in nested_sites for site in sites]
-#     return MPS(flattened_sites)

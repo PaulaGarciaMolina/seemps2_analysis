@@ -29,7 +29,7 @@ def mps_empty(sites: int) -> MPS:
     return MPS([np.zeros((1, 2, 1))] * sites)
 
 
-def mps_interval(interval: Interval) -> MPS:
+def mps_position(interval: Interval) -> MPS:
     """
     Return a Matrix Product State (MPS) corresponding to the specified interval.
 

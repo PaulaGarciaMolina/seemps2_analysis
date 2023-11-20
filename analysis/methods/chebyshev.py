@@ -2,15 +2,15 @@ import numpy as np
 import h5py
 import pathlib
 from copy import deepcopy
-from typing import Callable, List, Union, Optional
+from typing import Callable, List, Optional
+from scipy.linalg import eigvals
 
-from seemps.hdf5 import read_mps, write_mps, read_mpo, write_mpo
-from seemps.cross import Mesh, Interval, ChebyshevZerosInterval
-from seemps.state import MPS, Strategy, DEFAULT_TOLERANCE
-from seemps.mpo import MPO, MPOSum, MPOList
+from seemps.hdf5 import read_mps, write_mps
+from seemps.cross import Mesh, ChebyshevZerosInterval
+from seemps.state import MPS, Strategy
+from seemps.truncate import simplify
 
 from .factories_mps import mps_empty, mps_identity, mps_position, join_list
-from .factories_mps import mpo_empty, mpo_identity
 
 DATA_PATH = str(pathlib.Path(__file__).parent.absolute()) + "/data/"
 
@@ -143,78 +143,26 @@ def _coef_tensor(func: Callable, mesh: Mesh, orders: List[int]) -> np.ndarray:
     return coef_tensor
 
 
-def _put_at(indices, axis):
+def chebyshev_expand(func, mesh, orders, method="clenshaw", strategy=Strategy()):
     """
-    Auxiliary function to index tensors more easily.
-    From: https://stackoverflow.com/questions/42656930/numpy-assignment-like-numpy-take
-
-    This function provides a convenient way to index tensors by specifying the indices to put
-    at a specific axis, and allows to use a notation similar than with 1d tensors.
+    Encode a multivariate function in a Matrix Product State (MPS) using a truncated Chebyshev expansion.
 
     Parameters:
-        indices (int or slice or array-like): The indices to put at the specified axis.
-        axis (int): The axis at which to place the indices.
+        func (callable): The function to be approximated and represented as an MPS.
+        mesh (Mesh): The mesh on which the function is sampled.
+        orders (List[int]): The list of Chebyshev polynomial orders to be used for the expansion.
+        method (str, optional): The method for performing the Chebyshev expansion ("sum", "clenshaw", or "factor").
+        strategy (Strategy, optional): The strategy used for MPS construction (default: Strategy()).
 
     Returns:
-        tuple: A tuple of slice objects and indices that can be used for indexing tensors.
+        MPS: The MPS representation of the function obtained through Chebyshev expansion.
     """
-    slc = (slice(None),)
-    return (axis < 0) * (Ellipsis,) + axis * slc + (indices,) + (-1 - axis) * slc
-
-
-def _differentiate_coef_tensor(coef_tensor: np.ndarray, m: int) -> np.ndarray:
-    """
-    Compute the derivative along a specified dimension of a tensor of Chebyshev coefficients exploiting
-    the properties of Chebyshev polynomials.
-
-    Parameters:
-        coef_tensor (np.ndarray): The tensor of Chebyshev coefficients.
-        m (int): The dimension along which the derivative is computed.
-
-    Returns:
-        np.ndarray: The resulting tensor of coefficients after differentiation along the specified dimension.
-    """
-    shape = coef_tensor.shape
-    d = shape[m]
-    ctensor_d = np.zeros(shape[:m] + (d + 1,) + shape[m + 1 :])
-    for i in range(d - 2, -1, -1):
-        ctensor_d[_put_at(i, m)] = 2 * (i + 1) * np.take(coef_tensor, i + 1, axis=m) + np.take(
-            ctensor_d, i + 2, axis=m
-        )
-    ctensor_d[_put_at(range(d), m)] /= 2
-    ctensor_d[_put_at(0, m)] /= 2
-    return np.take(ctensor_d, range(d - 1), axis=m)
-
-
-def _integrate_coef_tensor(
-    coef_tensor: np.ndarray, m: int, c_int: Optional[float] = None
-) -> np.ndarray:
-    """
-    Compute the integral along a specified dimension of a tensor of Chebyshev coefficients exploiting
-    the properties of Chebyshev polynomials.
-
-    Parameters:
-        coef_tensor (np.ndarray): The tensor of Chebyshev coefficients.
-        m (int): The dimension along which the integral is computed.
-
-    Returns:
-        np.ndarray: The resulting tensor of coefficients after integration along the specified dimension.
-    """
-    shape = coef_tensor.shape
-    d = shape[m]
-    ctensor_i = np.zeros(shape[:m] + (d - 2,) + shape[m + 1 :])
-    ctensor_i[_put_at(1, m)] = (
-        2 * np.take(coef_tensor, 0, axis=m) - np.take(coef_tensor, 2, axis=m)
-    ) / 2
-    for i in range(2, d - 2):
-        ctensor_i[_put_at(i, m)] = (
-            np.take(coef_tensor, i - 1, axis=m) - np.take(coef_tensor, i + 1, axis=m)
-        ) / (2 * i)
-    ctensor_i[_put_at(range(d - 2), m)] *= 2
-    if c_int == None:
-        c_int = np.take(coef_tensor, 0, axis=m)  # Equivalent to c=0
-    ctensor_i[_put_at(0, m)] = c_int  # Constant of integration
-    return ctensor_i
+    if method == "sum":
+        return chebyshev_partial_sum(func, mesh, orders, strategy)
+    elif method == "clenshaw":
+        return chebyshev_clenshaw(func, mesh, orders, strategy)
+    elif method == "factor":
+        return chebyshev_factor(func, mesh, orders, strategy)
 
 
 def chebyshev_partial_sum(
@@ -231,13 +179,6 @@ def chebyshev_partial_sum(
 
     Returns:
         MPS: An MPS encoding the function through the Chebyshev partial sum.
-
-    Example:
-        mesh = ...  # Create a Chebyshev mesh with intervals
-        orders = [3, 4, 2]  # Specify Chebyshev orders for each interval
-        result_mps = chebyshev_expand(my_multivariate_function, mesh, orders)
-        # 'result_mps' will contain an MPS encoding 'my_multivariate_function' through
-        # the truncated Chebyshev expansion over the specified Chebyshev mesh.
     """
     coef_tensor = _coef_tensor(func, mesh, orders)
     mps = mps_empty(int(np.log2(np.prod(mesh.shape()[:-1]))))
@@ -268,13 +209,6 @@ def chebyshev_clenshaw(
 
     Returns:
         MPS: An MPS encoding the function using the Clenshaw algorithm for Chebyshev expansion.
-
-    Example:
-        mesh = ...  # Create a Chebyshev mesh with intervals
-        order = 5  # Specify the order of the Chebyshev expansion
-        result_mps = chebyshev_expand_clenshaw(my_function, mesh, order)
-        # 'result_mps' will contain an MPS encoding 'my_function' using the Clenshaw algorithm
-        # for Chebyshev expansion over the specified Chebyshev mesh.
     """
     # TODO: Generalize to multivariate case
     coef_vector = _coef_tensor(func, mesh, order)
@@ -293,7 +227,116 @@ def chebyshev_clenshaw(
     return mps
 
 
-# TODO: Implement the monomial method
+def chebyshev_factor(func, mesh, orders, strategy):
+    """
+    Encode a function in a Matrix Product State (MPS) using the factorization method.
+
+    Parameters:
+        func (Callable): The function to be encoded.
+        mesh (Mesh): The Chebyshev mesh over which the function is approximated.
+        order (int): The order of the Chebyshev expansion.
+        strategy (Strategy): An optional strategy for joining tensors during the computation.
+
+    Returns:
+        MPS: An MPS encoding the function using the monomial representation of the Chebyshev polynomial.
+    """
+    if mesh.dimension != 1:
+        raise ValueError("At the moment this method only works for one-dimensional functions")
+    # 1. Compute Chebyshev coefficients
+    coef_tensor = _coef_tensor(func, mesh, orders)
+
+    # 2. Find the roots of the polynomial in standard form
+    companion = np.polynomial.chebyshev.chebcompanion(coef_tensor)
+    roots = eigvals(companion)
+
+    # 3. Represent each monomial as an MPS
+    mps_list = []
+    for root in roots:
+        interval = deepcopy(mesh.interval)
+        interval.start += root
+        interval.stop += root
+        mps_list.append(mps_position(interval))
+
+    # 4. Compute the wavefunction product of each MPS
+    mps = mps_list[0]
+    for mps_term in mps_list[1:]:
+        mps *= mps_term
+        mps = simplify(mps, strategy)
+    return mps
+
+
+def _put_at(indices, axis):
+    """
+    Auxiliary function to index tensors more easily.
+    From: https://stackoverflow.com/questions/42656930/numpy-assignment-like-numpy-take
+
+    This function provides a convenient way to index tensors by specifying the indices to put
+    at a specific axis, and allows to use a notation similar than with 1d tensors.
+
+    Parameters:
+        indices (int or slice or array-like): The indices to put at the specified axis.
+        axis (int): The axis at which to place the indices.
+
+    Returns:
+        tuple: A tuple of slice objects and indices that can be used for indexing tensors.
+    """
+    slc = (slice(None),)
+    return (axis < 0) * (Ellipsis,) + axis * slc + (indices,) + (-1 - axis) * slc
+
+
+def _differentiate_coef_tensor(coef_tensor: np.ndarray, m: int) -> np.ndarray:
+    """
+    Compute the derivative along a specified dimension of a tensor of Chebyshev coefficients
+    exploiting the properties of Chebyshev polynomials.
+
+    Parameters:
+        coef_tensor (np.ndarray): The tensor of Chebyshev coefficients.
+        m (int): The dimension along which the derivative is computed.
+
+    Returns:
+        np.ndarray: The resulting tensor of coefficients after differentiation along the specified dimension.
+    """
+    shape = coef_tensor.shape
+    d = shape[m]
+    ctensor_d = np.zeros(shape[:m] + (d + 1,) + shape[m + 1 :])
+    for i in range(d - 2, -1, -1):
+        ctensor_d[_put_at(i, m)] = 2 * (i + 1) * np.take(coef_tensor, i + 1, axis=m) + np.take(
+            ctensor_d, i + 2, axis=m
+        )
+    ctensor_d[_put_at(range(d), m)] /= 2
+    ctensor_d[_put_at(0, m)] /= 2
+    return np.take(ctensor_d, range(d - 1), axis=m)
+
+
+def _integrate_coef_tensor(
+    coef_tensor: np.ndarray, m: int, c_int: Optional[float] = None
+) -> np.ndarray:
+    """
+    Compute the integral along a specified dimension of a tensor of Chebyshev coefficients
+    exploiting the properties of Chebyshev polynomials.
+
+    Parameters:
+        coef_tensor (np.ndarray): The tensor of Chebyshev coefficients.
+        m (int): The dimension along which the integral is computed.
+
+    Returns:
+        np.ndarray: The resulting tensor of coefficients after integration along the specified dimension.
+    """
+    shape = coef_tensor.shape
+    d = shape[m]
+    ctensor_i = np.zeros(shape[:m] + (d - 2,) + shape[m + 1 :])
+    ctensor_i[_put_at(1, m)] = (
+        2 * np.take(coef_tensor, 0, axis=m) - np.take(coef_tensor, 2, axis=m)
+    ) / 2
+    for i in range(2, d - 2):
+        ctensor_i[_put_at(i, m)] = (
+            np.take(coef_tensor, i - 1, axis=m) - np.take(coef_tensor, i + 1, axis=m)
+        ) / (2 * i)
+    ctensor_i[_put_at(range(d - 2), m)] *= 2
+    if c_int == None:
+        c_int = np.take(coef_tensor, 0, axis=m)  # Equivalent to c=0
+    ctensor_i[_put_at(0, m)] = c_int  # Constant of integration
+    return ctensor_i
 
 
 # def mpo_chebyshev(

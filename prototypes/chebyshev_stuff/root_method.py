@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from numpy.polynomial.chebyshev import cheb2poly
 from scipy.linalg import eigvals
 
-from analysis.methods.chebyshev_vector import _coef_tensor
+from analysis.methods.chebyshev import _coef_tensor
 from seemps.cross import Mesh, RegularHalfOpenInterval
 
 def compute_chebyshev_coefficients(func, orders, a=-1, b=1):
