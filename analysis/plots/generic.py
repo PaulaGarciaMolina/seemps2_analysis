@@ -9,6 +9,7 @@ class PlotParameters:
     xlabel: str = "x"
     ylabel: str = "y"
     zlabel: str = "z"
+    xscale: str = "linear"
     yscale: str = "linear"
     title: Optional[str] = None
     legend_title: Optional[str] = None
@@ -53,6 +54,7 @@ def plot_line(
     axs.set_xlabel(parameters.xlabel)
     axs.set_ylabel(parameters.ylabel)
     axs.set_title(parameters.title)
+    axs.set_xscale(parameters.xscale)
     axs.set_yscale(parameters.yscale)
 
     # Save the figure

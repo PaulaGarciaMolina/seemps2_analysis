@@ -143,7 +143,7 @@ def _coef_tensor(func: Callable, mesh: Mesh, orders: List[int]) -> np.ndarray:
     return coef_tensor
 
 
-def chebyshev_expand(func, mesh, orders, method="clenshaw", strategy=Strategy()):
+def chebyshev_expand(func, mesh, orders, method="sum", strategy=Strategy()):
     """
     Encode a multivariate function in a Matrix Product State (MPS) using a truncated Chebyshev expansion.
 

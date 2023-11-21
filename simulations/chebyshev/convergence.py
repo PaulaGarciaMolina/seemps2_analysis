@@ -11,7 +11,7 @@ from seemps.state import Strategy
 from seemps.cross import Mesh, RegularClosedInterval
 
 from analysis.utils import time_this
-from analysis.methods import chebyshev_expand, chebyshev_expand_clenshaw_1d, integrate_mps
+from analysis.methods import chebyshev_expand, integrate_mps
 from analysis.functions import distance_norm_1, distance_norm_2, distance_norm_inf, step, absolute
 from analysis.loops import param_loop
 from analysis.plots import PlotParameters, plot_line, set_mosaic
@@ -29,8 +29,8 @@ def helper(func: Callable, m: int, a: float, b: float) -> Callable:
         mesh = Mesh([RegularClosedInterval(a, b, 2**n) for _ in range(m)])
         orders = [d for _ in range(m)]
         strategy = Strategy()  # tolerance=t)
-        mps, time_expand = time_this(chebyshev_expand_clenshaw_1d)(
-            func, mesh, orders, strategy=strategy
+        mps, time_expand = time_this(chebyshev_expand)(
+            func, mesh, orders, method="clenshaw", strategy=strategy
         )
 
         # Compute integrals
@@ -121,6 +121,7 @@ def main(
     parameters_n3 = replace(
         parameters_n,
         ylabel=r"$time(s)$",
+        xscale="log",
         legend_title="Computation period",
         legend_labels=[
             "chebyshev expansion",
@@ -133,7 +134,7 @@ def main(
             "norm-inf",
         ],
     )
-    plot_line(nlist, times_n, axs=axs[0, 2], parameters=parameters_n3)
+    plot_line(nlist, times_n[:, 0:5], axs=axs[0, 2], parameters=parameters_n3)
 
     # Second Row: Plots as a function of d (integral, norm and runtime).
     parameters_d = PlotParameters(xlabel="d", style="-o", yscale="log")
@@ -145,8 +146,8 @@ def main(
         title=f"(fixing n = {nlist[-1]}, t = {tlist[-1]})",
     )
     plot_line(dlist, distances_d, axs=axs[1, 1], parameters=parameters_d2)
-    parameters_d3 = replace(parameters_d, ylabel=r"$time(s)$")
-    plot_line(dlist, times_d, axs=axs[1, 2], parameters=parameters_d3)
+    parameters_d3 = replace(parameters_d, ylabel=r"$time(s)$", xscale="log")
+    plot_line(dlist, times_d[:, 0:5], axs=axs[1, 2], parameters=parameters_d3)
 
     plt.suptitle(f"Chebyshev convergence analysis for {name}")
     plt.tight_layout()
@@ -181,7 +182,7 @@ if __name__ == "__main__":
     func = lambda x: x**2
     exact_integral = (b**3 - a**3) / 3
     name = f"xsquared_[{a},{b}]"
-    main(func, m, a, b, nlist, dlist, tlist, exact_integral, name=name, show=show)
+    main(func, m, a, b, nlist, [2, 3], tlist, exact_integral, name=name, show=show)
 
     # 4. cos(k*x)
     k = 3

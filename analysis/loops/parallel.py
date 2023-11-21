@@ -9,8 +9,8 @@ def param_loop(
     Evaluate a function in parallel on all combinations of parameters defined in the params
     dictionary and optionally save the result in a pickle file.
 
-    This takes advantage of the "embarrassingly parallel" nature of evaluating a loop and
-    distributes the work across multiple processes or cores to get a large speedup.
+    This takes advantage of the "embarrassingly parallel" nature of evaluating a combination
+    and distributes the work across multiple processes or cores to get a large speedup.
 
     Parameters:
         func (callable): The function to be evaluated.
