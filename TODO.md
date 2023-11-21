@@ -25,4 +25,4 @@
 - Develop prototypes (Padé, SPC, CrossDMRG, extrapolation, circuit method...).
 - Further optimize the libraries.
     - JAX / PyTorch port for GPU.
-    - C++ ports.
+    - C++ ports. 
